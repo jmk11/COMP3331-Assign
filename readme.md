@@ -1,7 +1,8 @@
 Instant messaging client and server.
 
 ```bash
-make
+meson build
+...
 ```
 
 ```bash

@@ -30,20 +30,6 @@ bool execSetupP2P(char *argsinput, Connection *connection);
 void sendP2PFail(Connection *connection, char *failedName);
 
 // CHECK THAT THE ARGS ARE THERE!
-// will need some sort of mutex here because this is the only one where a user
-// changes another user's data 
-// can't have one thread/user halfway through adding
-// a message while another thread is halfway through reading them 
-// userR could come online after userS has determined they are offline and while userS is
-// halfway through adding a message to their offline messages then userR logs
-// in, receives offline messages and has none then userS continues adding
-// offline message that won't be read until next time userR logs in So need lock
-// for after userS has determined userR is offline, userR can't check messages
-// until userS is done (and no other users can add messages to userR at the same
-// time) or some way to interrupt adding offline message to send online message
-// instead but no... also blockedUsers? Could get messed up if traversing
-// through another user's blockedUser list while they remove a user from it only
-// one reader at a time so probably can just use normal lock, not rwlock
 bool execMessage(char *argsinput, Connection *connection) {
     unsigned char numArgs = 2;
     char *args[numArgs];
@@ -64,7 +50,7 @@ bool execMessage(char *argsinput, Connection *connection) {
             snprintf(str, MAXLENGTH, "You can't message %s as they have blocked you.\n", recipient);
             appendBuffer(&connection->sendBuffer, str, 0);
         } else {
-            addMessage(connection->client->user, recipientUser, msg, USER);
+            addMessage(connection->client->user, recipientUser, msg, USER_MESSAGE);
         }
     }
 
@@ -84,19 +70,10 @@ bool execBroadcast(char *argsinput, Connection *connection) {
     // check num of args: maybe checkNumArgs(args, argNum) function?
 
     char *msg = argsinput;
-    // construct message
-    // char str[MAXLENGTH]; // name !!
-    // snprintf(str, MAXLENGTH, "%s: %s", getUsername(connection->user), msg);
-    bool complete = broadcast(connection->client->user, msg, USER);
+    bool complete = broadcast(connection->client->user, msg, USER_MESSAGE);
     if (complete == false) {
-        appendBuffer(&connection->sendBuffer,
-                     "Your message could not be delivered to some recipients\n",
-                     0);
+        appendBuffer(&connection->sendBuffer, "Your message could not be delivered to some recipients\n", 0);
     }
-
-    // appendBuffer(&connection->sendBuffer, "Broadcast ");
-    // appendBuffer(&connection->sendBuffer, msg);
-    // appendBuffer(&connection->sendBuffer, "\n");
 
     return true;
 }
@@ -104,25 +81,14 @@ bool execBroadcast(char *argsinput, Connection *connection) {
 // maybe need lock here
 // if implement as reading through userList to see who is loggedIn, then the
 // list won't change, only the loggedIn variable sounds okay? if another user
-// logs in as this is executing then it seems fair that they may or may not be
-// included if implement as reading through a list of loggedin users, WOULD need
-// lock? new user could be added (noone can ever be removed) to tail while
-// reading. If before tail, doesn't matter. Could determine that cur->next =
-// null but then it changes to not null before exit. Doesn't sound bad? BUT it
-// does matter if something is partially added and then this tries to read it eg
-// if tail->next has been set but the values inside not instantiated but I could
-// just avoid that by only setting tail->next when the next is fully set up WHAT
-// ABOUT BLOCKED USERS? ???
+// logs in as this is executing then it seems fair that they may or may not be included
 bool execWhoelse(Connection *connection) {
     // no args
-    // appendBuffer(&connection->sendBuffer, "noone\n");
-    // use linked list? of loggedIn users
-    // or go through users for loggedIn users
+    // go through users for loggedIn users
     bool found = false;
     // mutex on users being logged in?
     for (UserList *cur = userList; cur != NULL; cur = cur->next) {
-        if (cur->user != connection->client->user &&
-            (isLoggedIn(cur->user) == true)) {
+        if (cur->user != connection->client->user && (isLoggedIn(cur->user) == true)) {
             appendBuffer(&connection->sendBuffer, getUsername(cur->user), 0);
             appendBuffer(&connection->sendBuffer, "\n", 0);
             found = true;
@@ -148,9 +114,7 @@ bool execWhoelsesince(char *argsinput, Connection *connection) {
 
         struct timespec ts;
         Clock_gettime(CLKID, &ts);
-        // getTime(&ts);
-        time_t sinceTime =
-            ts.tv_sec - seconds; // !! should it just be -seconds ??
+        time_t sinceTime = ts.tv_sec - seconds; // !! should it just be -seconds ??
         // get linked list? of users active since that time
         // loop through userList? but would need to redefine userList so next
         // field was accessible dTODO: CHANGE THIS TO PROPER WAY!! get all
@@ -158,11 +122,8 @@ bool execWhoelsesince(char *argsinput, Connection *connection) {
         bool found = false;
         for (UserList *cur = userList; cur != NULL; cur = cur->next) {
             if ((cur->user != connection->client->user) &&
-                ((isLoggedIn(cur->user) == true) ||
-                 ((getLastSeen(cur->user) >= sinceTime) &&
-                  (getLastSeen(cur->user) > 0)))) {
-                appendBuffer(&connection->sendBuffer, getUsername(cur->user),
-                             0);
+                ((isLoggedIn(cur->user) == true) || ((getLastSeen(cur->user) >= sinceTime) && (getLastSeen(cur->user) > 0)))) {
+                appendBuffer(&connection->sendBuffer, getUsername(cur->user), 0);
                 appendBuffer(&connection->sendBuffer, "\n", 0);
                 found = true;
             }
@@ -175,8 +136,6 @@ bool execWhoelsesince(char *argsinput, Connection *connection) {
     return true;
 }
 
-// Another thread could attempt to read the blocked list while this one is
-// editing it blockedUser list needs rwblock - maybe put it in the struct?
 bool execBlock(char *argsinput, Connection *connection) {
     unsigned char arrLength = 2;
     char *args[arrLength];
@@ -186,17 +145,14 @@ bool execBlock(char *argsinput, Connection *connection) {
 
     // char *blockee = argsinput; // but probably just want first word
 
-    // same as message - generalise somehow? Just need to change text "message"
-    // to "blocked"
+    // same as message - generalise somehow? Just need to change text "message" to "blocked"
     if (blockee == NULL) {
         appendBuffer(&connection->sendBuffer, "Invalid arguments.\n", 0);
     } else {
         User *blockeeUser = findUser(userList, blockee);
         if (blockeeUser == NULL) {
             char str[MAXLENGTH];
-            snprintf(str, MAXLENGTH,
-                     "User %s does not exist and cannot be blocked.\n",
-                     blockee);
+            snprintf(str, MAXLENGTH, "User %s does not exist and cannot be blocked.\n", blockee);
             appendBuffer(&connection->sendBuffer, str, 0);
         } else if (blockeeUser == connection->client->user) {
             appendBuffer(&connection->sendBuffer, "You can't block yourself!\n", 0);
@@ -241,7 +197,7 @@ bool execUnblock(char *argsinput, Connection *connection) {
             appendBuffer(&connection->sendBuffer,
                          "You can't unblock yourself!\n", 0);
         } else {
-            if (unblockUser(connection->client->user, blockeeUser) == FALSE) {
+            if (unblockUser(connection->client->user, blockeeUser) == false) {
                 appendBuffer(&connection->sendBuffer, "Cannot block ", 0);
                 appendBuffer(&connection->sendBuffer, blockee, 0);
                 appendBuffer(&connection->sendBuffer,
@@ -257,30 +213,6 @@ bool execUnblock(char *argsinput, Connection *connection) {
 
     return true;
 }
-
-// could affect messages online/offline - another thread determines that user is
-// online, sends an online message but then user logs out before it arrives and
-// it doesn't get sent as offline message I guess would have to not allow logout
-// until all online messages have arrived? But what if other people just keep
-// sending messages so can't log out? and also whoelse messages, but that might
-// not be a problem OR could implement offline and online messages as the same
-// thing and the client just retrieves them whenever ready - when online,
-// continuously
-// bool execLogout() {
-//     /*
-//     // no args
-//     appendBuffer(&connection->sendBuffer, "Logout\n");
-//     logout(connection->user);
-//     // notify others of logout - broadcast
-//     // more
-
-//     char str[MAXLENGTH]; // name !!
-//     snprintf(str, MAXLENGTH, "%s HAS LOGGED OUT",
-//     getUsername(connection->user)); broadcast(connection->user, str, SERVER);
-//      */
-
-//     return FALSE;
-// }
 
 bool execStartPrivate(char *argsinput, Connection *connection) {
     unsigned char numArgs = 2;
@@ -429,39 +361,10 @@ void sendP2PFail(Connection *connection, char *failedName) {
     sendBuffer(connection);
 }
 
-/*
-bool execPrivate(char *argsinput, Connection *connection) {
-    // char str[MAXLENGTH];
-    // snprintf(str, MAXLENGTH, "Something has gone wrong. This command should
-    // not have been sent to the server.\n");
-    // appendBuffer(&connection->sendBuffer, str, 0);
-    return TRUE;
-}
-*/
-
-/*
-bool execStopPrivate(char *argsinput, Connection *connection) {
-    // unsigned char numArgs = 2;
-    // char *args[numArgs];
-    // parseRequest(argsinput, numArgs, args);
-    // char *partner = args[0];
-
-    // maybe: this message does not come directly typed in from user but sent
-    // from client so the server can keep track of connections? Salil says in
-    // forum that shouldn't do this
-
-    // appendBuffer(&connection->sendBuffer, "Something has gone wrong. This
-    // command should not have been sent to the server.\n", 0);
-
-    return TRUE;
-}
-*/
-
 bool execSetupP2P(char *argsinput, Connection *connection) {
     // argsinput is pointer to start of port in network order binary form
     // it is 2 bytes, then is the double null byte
-    memcpy(&connection->client->p2pserverport, argsinput,
-           sizeof(connection->client->p2pserverport));
+    memcpy(&connection->client->p2pserverport, argsinput, sizeof(connection->client->p2pserverport));
     return true;
 }
 
@@ -504,8 +407,8 @@ bool execCommand(char *command, char *argsinput, Connection *connection) {
         return false; // why does this return false and stopprivate true
     } else if (strcmp(command, "startprivate") == 0) {
         return execStartPrivate(argsinput, connection);
-    } else if (strcmp(command, "private") == 0) {
-        return execPrivate(argsinput, connection);
+    // } else if (strcmp(command, "private") == 0) {
+    //     return execPrivate(argsinput, connection);
     // } else if (strcmp(command, "stopprivate") == 0) { // this command shouldn't be sent to server
     //     return true;
     } else if (strcmp(command, "setupp2p") == 0) {
@@ -544,5 +447,57 @@ bool (*matchCommand(char *command))(char *argsinput, Connection *connection) {
     } else {
         return execIncorrectCommand;
     }
+}
+*/
+
+// could affect messages online/offline - another thread determines that user is
+// online, sends an online message but then user logs out before it arrives and
+// it doesn't get sent as offline message I guess would have to not allow logout
+// until all online messages have arrived? But what if other people just keep
+// sending messages so can't log out? and also whoelse messages, but that might
+// not be a problem OR could implement offline and online messages as the same
+// thing and the client just retrieves them whenever ready - when online,
+// continuously
+// bool execLogout() {
+//     /*
+//     // no args
+//     appendBuffer(&connection->sendBuffer, "Logout\n");
+//     logout(connection->user);
+//     // notify others of logout - broadcast
+//     // more
+
+//     char str[MAXLENGTH]; // name !!
+//     snprintf(str, MAXLENGTH, "%s HAS LOGGED OUT",
+//     getUsername(connection->user)); broadcast(connection->user, str, SERVER);
+//      */
+
+//     return FALSE;
+// }
+
+/*
+bool execPrivate(char *argsinput, Connection *connection) {
+    // char str[MAXLENGTH];
+    // snprintf(str, MAXLENGTH, "Something has gone wrong. This command should
+    // not have been sent to the server.\n");
+    // appendBuffer(&connection->sendBuffer, str, 0);
+    return TRUE;
+}
+*/
+
+/*
+bool execStopPrivate(char *argsinput, Connection *connection) {
+    // unsigned char numArgs = 2;
+    // char *args[numArgs];
+    // parseRequest(argsinput, numArgs, args);
+    // char *partner = args[0];
+
+    // maybe: this message does not come directly typed in from user but sent
+    // from client so the server can keep track of connections? Salil says in
+    // forum that shouldn't do this
+
+    // appendBuffer(&connection->sendBuffer, "Something has gone wrong. This
+    // command should not have been sent to the server.\n", 0);
+
+    return TRUE;
 }
 */

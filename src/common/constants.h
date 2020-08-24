@@ -25,6 +25,7 @@
 // enum??
 
 // LOGIN:
+// typedef enum loginResult {SUCCESS, INVALIDUSERNAME, INCORRECTPASSWORD, BARRED, NOWBARRED, LOGGEDIN} loginResult;
 #define LOGINSUCCESSFUL 0
 #define INVALIDUSERNAME 1
 #define INCORRECTPASSWORD 2
@@ -51,8 +52,8 @@ typedef char byte;
 //typedef struct in_addr IPType;
 
 // !! I think this should not be in this file??
-enum MessageType { USER,
-                   SERVER }; // names - info notification?
+enum MessageType { USER_MESSAGE,
+                   SERVER_MESSAGE }; // names - info notification?
 typedef enum MessageType MessageType;
 
 #endif //PROJECT_CONSTANTS_H

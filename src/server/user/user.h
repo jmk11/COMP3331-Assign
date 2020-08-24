@@ -41,11 +41,4 @@ char *getUsername(const User *user); // !! return const?
 
 int getMsgsEventfd(const User *user);
 
-//void addRequest(User *requestee, const User *requester, IP ip, unsigned short port);
-//void retrieveRequest(User *requestee, char **requesterName, IP *ip, unsigned short *port);
-//void clearRequest(User *requestee);
-
-//int getRequestsEventfd(const User *user);
-
-
 #endif //PROJECT_USER_H

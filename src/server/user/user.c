@@ -19,21 +19,18 @@ then this new login attempt is denied
 #include <string.h>
 #include <sys/eventfd.h>
 #include <time.h>
+#include <stdbool.h>
 
 #include "blockedusers.h"
 #include "common/helpers.h"
 #include "message.h"
 #include "user.h"
-//#include "p2prequests.h"
-//
 
 // PRIVATE:
 //User *findUser(User *userList, char *username);
 //void initialiseUser(User *user, const char *username, const char *password);
 //char notBarred(User *user, unsigned long blockDuration);
 bool barred(User *user, unsigned long blockDuration);
-
-// rather than passing around user pointers, I could have a users array and pass around indexes
 
 // does it have to be 8 byte or 4 byte aligned?
 // this would have 6 bytes of padding between loggedIn and blockedUsers?
@@ -42,14 +39,13 @@ bool barred(User *user, unsigned long blockDuration);
 struct User {
     char *username;
     char *password;
-    char failedAttempts;
+    unsigned int failedAttempts;
     bool loggedIn;   // boolean: or could implement as list of logged in users in Server
     time_t barredAt; // blocked?: time of blocking in unix seconds. Checked when user tries to log in. If enough seconds have passed, set back to 0?
     time_t lastSeen;
-    messageList messages; // for waiting messages - sent while user offline
-    //BUNode *blockedUsers; // list of users they blocked !!!! PROBLEM // I don't remember what the problem was
+    messageList messages; // for waiting messages
     BUList *blockedUsers;
-    //p2pRList p2prequests;
+    pthread_rwlock_t loginLock;
 };
 
 // manual says malloc is MT-safe but I'm not sure exactly what that means
@@ -57,19 +53,13 @@ struct User {
 User *createUser(const char *username, const char *password) {
     User *user = Malloc(sizeof(User));
 
-    user->loggedIn = FALSE;
+    user->loggedIn = false;
     user->barredAt = 0;
     user->failedAttempts = 0;
     user->lastSeen = 0; // or should I set here?
+    user->username = strdup(username);
+    user->password = strdup(password);
 
-    user->username = Malloc(strlen(username) + 1); // !! CHECK MATH. ??: CAST TO ADDR BEFORE DOING POINTER ARITHMETIC ??????
-    strcpy(user->username, username);              // !! CHECK
-    user->password = Malloc(strlen(password) + 1);
-    strcpy(user->password, password);
-
-    //user->blockedUsers = NULL;
-    //user->blockedUsers.head = NULL;
-    //Pthread_rwlock_init(&user->blockedUsers.rwlock, NULL);
     user->blockedUsers = createBUList();
 
     user->messages.head = NULL;
@@ -79,10 +69,6 @@ User *createUser(const char *username, const char *password) {
     user->messages.eventfd = Eventfd(0, EFD_SEMAPHORE); // not sure if the passing around of this breaks encapsulation. Possibly badly.
     // especially since the writing occurs here but the reading in server.c
 
-    //user->p2prequests.head = NULL;
-    //Pthread_mutex_init(&user->p2prequests.mutex, NULL);
-    //user->p2prequests.eventfd = Eventfd(0, EFD_SEMAPHORE);
-
     return user;
 }
 
@@ -91,17 +77,12 @@ User *createUser(const char *username, const char *password) {
 // and actually it never gets run because server is shut down by ctrlc
 void freeUser(User *user) {
     if (user != NULL) {
-        //Pthread_rwlock_destroy(&user->blockedUsers.rwlock);
         freeBlockedUsers(user->blockedUsers);
 
         sem_destroy(&(user->messages.messageCount)); // this right?? // wrapper?
         Pthread_mutex_destroy(&user->messages.mutex);
         Close(user->messages.eventfd); // is this right? should I close?
         freeMessages(user->messages.head);
-
-        //Pthread_mutex_destroy(&user->p2prequests.mutex);
-        //Close(user->p2prequests.eventfd);
-        //freep2pRList(user->p2prequests.head);
 
         free(user->password);
         free(user->username);
@@ -110,24 +91,23 @@ void freeUser(User *user) {
 }
 
 //char login(User *userList, char *username, char *password, unsigned long blockDuration, User **loggedinUser)
-char login(User *user, const char *password, unsigned long blockDuration) // I don't like removing loggedInUser.. feels wrong to just assume that the user is now logged in based on returned number
-{
-    //User *user = findUser(userList, username);
-    //*loggedinUser = NULL;
+char login(User *user, const char *password, unsigned long blockDuration) { // I don't like removing loggedInUser.. feels wrong to just assume that the user is now logged in based on returned number
     if (user == NULL) {
         return INVALIDUSERNAME;
     } // should this be here? or in find user?
-    if (isLoggedIn(user) == TRUE) {
-        return LOGGEDIN;
+    // if (isLoggedIn(user) == true) {
+    Pthread_rwlock_wrlock(&user->loginLock);
+    char result;
+    if (user->loggedIn == true) {
+        result = LOGGEDIN;
     }
-    if (barred(user, blockDuration) == TRUE) {
-        return BARRED;
+    if (barred(user, blockDuration) == true) {
+        result = BARRED;
     }
     if (strcmp((user)->password, password) == 0) {
-        user->loggedIn = TRUE;
+        user->loggedIn = true;
         user->failedAttempts = 0;
-        //*loggedinUser = user;
-        return LOGINSUCCESSFUL;
+        result = LOGINSUCCESSFUL;
     } else {
         user->failedAttempts++;
         if (user->failedAttempts >= MAXATTEMPTS) {
@@ -136,11 +116,14 @@ char login(User *user, const char *password, unsigned long blockDuration) // I d
             //GETTIME(&ts);
             //getTime(&ts);
             user->barredAt = ts.tv_sec;
-            return NOWBARRED;
+            result = NOWBARRED;
             // !! is sec precise enough? or need for pass of blockDuration*billion nanoseconds?
+        } else {
+            result = INCORRECTPASSWORD;
         }
-        return INCORRECTPASSWORD;
     }
+    Pthread_rwlock_unlock(&user->loginLock);
+    return result;
 }
 
 // what if someone on another computer logs in to same user while this user is being barred?
@@ -151,20 +134,20 @@ char login(User *user, const char *password, unsigned long blockDuration) // I d
 // so need to lock, rw: I think only write once the password is determined as correct? else read?
 // except maybe you could somehow get an extra attempt if you log in on 2 computers at same time? is that so bad?
 // but is it really limited to just one attempt?
+
 bool barred(User *user, unsigned long blockDuration) {
     if (user->barredAt == 0) {
-        return FALSE; // free. !! or 0? is it yes barred or yes not barred????
+        return false; // free. !! or 0? is it yes barred or yes not barred????
     } else {
         struct timespec ts;
         Clock_gettime(CLKID, &ts);
-        //getTime(&ts);
         if (ts.tv_sec >= user->barredAt + blockDuration) // types? // !! SEC V NANOSECOND
         {
             user->barredAt = 0; // unblock
             user->failedAttempts = 0;
-            return FALSE;
+            return false;
         } else {
-            return TRUE;
+            return true;
         }
     }
 }
@@ -204,6 +187,7 @@ bool retrieveMessage(User *receiver, char **senderName, char **content, MessageT
 }
 
 // many layers again
+// maybe should just do in server.c as popMessage(user->messages)
 /*
  * Deletes the oldest message, allowing access to the next.
  */
@@ -215,7 +199,7 @@ void clearMessage(User *receiver) {
 // necessary? can use retrieveMessage
 // read/write lock maybe
 bool hasMessages(User *user) {
-    return user->messages.head == NULL ? FALSE : TRUE;
+    return user->messages.head == NULL ? false : true;
 }
 
 //===================================================================
@@ -256,7 +240,6 @@ bool unblockUser(User *blocker, const User *blockee) {
 void updateTimeActive(User *user) {
     struct timespec ts;
     Clock_gettime(CLKID, &ts);
-    //getTime(&ts);
     user->lastSeen = ts.tv_sec;
 }
 
@@ -275,7 +258,7 @@ void logout(User *user) {
     struct timespec ts;
     Clock_gettime(CLKID, &ts);
     user->lastSeen = ts.tv_sec;
-    user->loggedIn = FALSE;
+    user->loggedIn = false;
 }
 
 bool isLoggedIn(const User *user) {
@@ -285,76 +268,3 @@ bool isLoggedIn(const User *user) {
 int getMsgsEventfd(const User *user) {
     return user->messages.eventfd;
 }
-
-/*
-int getRequestsEventfd(const User *user)
-{
-    return user->p2prequests.eventfd;
-}*/
-
-/*
-char notBarred(User *user, unsigned long blockDuration) // !! NAME
-{
-    if (user->barredAt == 0) {
-        return 1; // free. !! or 0? is it yes barred or yes not barred????
-    }
-    else {
-        struct timespec ts;
-        Clock_gettime(CLOCK_REALTIME, &ts);
-        if (ts.tv_sec >= user->barredAt + blockDuration) // types? // !! SEC V NANOSECOND
-        {
-            user->barredAt = 0; // unblock
-            user->failedAttempts = 0;
-            return 1;
-        }
-        else {
-            return 0;
-        }
-    }
-}*/
-
-/*if (notBarred(user, blockDuration)) // !! rename to barred?
-    {
-        if (strcmp((user)->password, password) == 0) {
-            (user)->loggedIn = 1;
-            (user)->failedAttempts = 0;
-            //(*loggedinUser) = user;
-            return LOGINSUCCESSFUL;
-        }
-        else {
-            (user)->failedAttempts++;
-            if ((user)->failedAttempts >= MAXATTEMPTS) {
-                struct timespec ts;
-                Clock_gettime(CLOCK_REALTIME, &ts);
-                (user)->barredAt = ts.tv_sec;
-                return NOWBARRED;
-                // !! is sec precise enough? or need for pass of blockDuration*billion nanoseconds?
-            }
-            return INCORRECTPASSWORD;
-        }
-    }
-    return BARRED;*/
-
-//======================================================================
-// P2P REQUESTS
-/*
-void addRequest(User *requestee, const User *requester, IP ip, unsigned short port)
-{
-    if (requestee != NULL && requester != NULL) {
-        pushRequest(&requestee->p2prequests, requester, ip, port);
-    }
-}
-
-// return success?
-void retrieveRequest(User *requestee, char **requesterName, IP *ip, unsigned short *port)
-{
-    User *requester;
-    getRequest(&requestee->p2prequests, &requester, ip, port);
-    // checking?
-    *requesterName = requester->username;
-}
-
-void clearRequest(User *requestee)
-{
-    popRequest(&requestee->p2prequests);
-}*/

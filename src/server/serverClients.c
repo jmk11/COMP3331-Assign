@@ -3,6 +3,7 @@ Manages an individual client connection.
 */
 
 #include <poll.h>
+#include <stdbool.h>
 
 #include "server.h"
 
@@ -192,13 +193,13 @@ void processLogout(Connection *connection, bool connectionAlive) {
     // notify others of logout - broadcast
     char str[MAXLENGTH]; // name !!
     snprintf(str, MAXLENGTH, "%s HAS LOGGED OUT", getUsername(connection->client->user));
-    broadcast(connection->client->user, str, SERVER);
+    broadcast(connection->client->user, str, SERVER_MESSAGE);
 }
 
 void broadcastLogIn(Connection *connection) {
     char str[MAXLENGTH]; // name !!
     snprintf(str, MAXLENGTH, "%s HAS LOGGED IN", getUsername(connection->client->user));
-    broadcast(connection->client->user, str, SERVER);
+    broadcast(connection->client->user, str, SERVER_MESSAGE);
 }
 
 // the head of messageList could only have changed between retrieveMessage and clearMessage() if another thread was
@@ -224,11 +225,11 @@ void checkMessages2(Connection *connection) {
 
 void bufferMessage(SendBuffer *sendBuffer, const char *sender, const char *msg, MessageType messageType) {
     char str[MAXLENGTH];
-    if (messageType == USER) {
+    if (messageType == USER_MESSAGE) {
         snprintf(str, MAXLENGTH, "\t%s: %s\n", sender, msg);
         // \t to make different from input, since prompt isn't working. Other ideas?
         appendBuffer(sendBuffer, str, 0);
-    } else if (messageType == SERVER) {
+    } else if (messageType == SERVER_MESSAGE) {
         snprintf(str, MAXLENGTH, "\tSERVER: %s\n", msg);
         appendBuffer(sendBuffer, str, 0);
     }
@@ -396,14 +397,14 @@ char *getNextMessage(const char *buffer, ssize_t bytesReceived, char *curMessage
 // blockee: doesn't get presence notifications, does get messages
 // blocker: does get presence notifications   , doesn't get messages (as in spec + forums)
 bool broadcast(User *sender, char *msg, MessageType messageType) {
-    bool complete = TRUE;
+    bool complete = true;
     for (UserList *cur = userList; cur != NULL; cur = cur->next) {
         if (cur->user != sender && (isLoggedIn(cur->user) == TRUE)) {
-            if (!(messageType == SERVER && (isBlocked(sender, cur->user) == TRUE)) && // presence notifications: sender has not blocked receiver
-                !(messageType == USER && (isBlocked(cur->user, sender) == TRUE))) {   // user messages: receiver has not blocked sender
+            if (!(messageType == SERVER_MESSAGE && (isBlocked(sender, cur->user) == TRUE)) && // presence notifications: sender has not blocked receiver
+                !(messageType == USER_MESSAGE && (isBlocked(cur->user, sender) == TRUE))) {   // user messages: receiver has not blocked sender
                 addMessage(sender, cur->user, msg, messageType);
             } else {
-                complete = FALSE;
+                complete = false;
             }
         }
     }
