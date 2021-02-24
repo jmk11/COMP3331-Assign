@@ -24,7 +24,7 @@ and port to try to connect twice?
 
 #include "clients.h"
 #include "common/helpers.h"
-#include "user.h"
+// #include "user/user.h"
 
 // maybe I don't really want this to be private?
 // Not worth it? Don't want to call getSockfd() etc. all the time.
@@ -87,7 +87,7 @@ void freeClientNodeR(ClientNode *node) {
 */
 void removeClientNode(ClientsList *list, Client *client) {
     if (list->head == NULL) {
-        return NULL;
+        return;
     }
 
     Pthread_rwlock_wrlock(&list->rwlock); // could possibly be moved to allow more parallelization

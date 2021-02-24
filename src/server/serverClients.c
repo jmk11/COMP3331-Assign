@@ -101,9 +101,9 @@ void *handleClient(void *client) {
 
         char buffer[BUFSIZ];
         //ssize_t bytesReceived = -1;
-        bool connectionAlive = TRUE;
-        bool continueSession = TRUE;
-        while (continueSession == TRUE) {
+        bool connectionAlive = true;
+        bool continueSession = true;
+        while (continueSession == true) {
             // how to do timeout? Can make poll timeout at timeout, then do a recv and should say that connection is closed
             // but if the user receives messages every 5 seconds, then it will never timeout even though they aren't typing anything
             // I need the thread to wake up when it has been t seconds since the last recv
@@ -132,7 +132,7 @@ void *handleClient(void *client) {
             } else if (pollfds[recvTimerPoll].revents & POLLIN) {
                 // reading returns number of times expired, don't need to do it?
                 appendBuffer(&connection.sendBuffer, "\nYou have timed out.", 0);
-                continueSession = FALSE;
+                continueSession = false;
             } else {
                 //assert(0);
             }
@@ -153,14 +153,14 @@ void *handleClient(void *client) {
 }
 
 bool manageRecv(char *buffer, Connection *connection, bool *connectionAlive) {
-    bool continueSession = TRUE;
+    bool continueSession = true;
     char *args;
-    *connectionAlive = TRUE;
+    *connectionAlive = true;
 
     ssize_t bytesReceived = recv(connection->client->sockfd, buffer, BUFSIZ, 0);
     if (bytesReceived <= 0) {
-        continueSession = FALSE;
-        *connectionAlive = FALSE;
+        continueSession = false;
+        *connectionAlive = false;
     } else {
         buffer[MIN(bytesReceived, BUFSIZ - 1)] = 0; // !! remove? or adjust to add 2 null bytes in case client didn't?
         char *curMessage = buffer;
@@ -168,8 +168,9 @@ bool manageRecv(char *buffer, Connection *connection, bool *connectionAlive) {
             //printf("received:'%s'\n", buffer);
             //continueSession = communicate(connection, buffer);
             char *command = parseCommand(curMessage, &args);
-            bool (*execCommand)(char *, Connection *) = matchCommand(command); // just for fun
-            continueSession = execCommand(args, connection);
+            // bool (*execCommand)(char *, Connection *) = matchCommand(command); // just for fun
+            // continueSession = execCommand(args, connection);
+            continueSession = execCommand(command, args, connection);
             sendBuffer(connection); // send buffer even if not continue session?
             // updateTimeActive(connection->client->user);
             // IT SEEMS that whoelsesince should take every who is online, plus people who were logged in
@@ -183,7 +184,7 @@ bool manageRecv(char *buffer, Connection *connection, bool *connectionAlive) {
 }
 
 void processLogout(Connection *connection, bool connectionAlive) {
-    if (connectionAlive == TRUE) {
+    if (connectionAlive == true) {
         appendBuffer(&connection->sendBuffer, "\nLogging out. Goodbye.\n", 0);
         sendBuffer(connection);
     }
@@ -246,8 +247,8 @@ User *execLogin(Connection *connection) {
     char password[MAXLENGTH] = {0};
     char message[MAXLENGTH] = {0};
     User *user = NULL;
-    bool continueLogin = TRUE;
-    while (continueLogin == TRUE) { //&& user == NULL) { // If I'm gunna be checking then continueLogin then no point checking user as well
+    bool continueLogin = true;
+    while (continueLogin == true) { //&& user == NULL) { // If I'm gunna be checking then continueLogin then no point checking user as well
         getDetails(connection, username, password);
         continueLogin = doLogin(username, password, message, &user);
         appendBuffer(&connection->sendBuffer, message, 0);
@@ -275,7 +276,7 @@ bool doLogin(const char username[MAXLENGTH], const char password[MAXLENGTH], cha
         //str[0] = INPUTREQUIRED;
         *user = attemptUser;
         snprintf(msg, MAXLENGTH, "Login Successful!\nWelcome %s.\n\n", username);
-        return FALSE;
+        return false;
         //setBufferLoggedIn(); // not sure about putting this here? Maybe in handleClient()?
         //strlcat2(sendData, str, BUFSIZ, &sendDataSize);
         //NEW?: user = loginUser;
@@ -293,7 +294,7 @@ bool doLogin(const char username[MAXLENGTH], const char password[MAXLENGTH], cha
         snprintf(msg, MAXLENGTH,
                  "Login Failed.\nPassword incorrect.\nAccount %s has been blocked due to %d incorrect attempts. Please try again later.\n\n",
                  username, MAXATTEMPTS);
-        return FALSE;
+        return false;
     } else if (result == BARRED) {
         //str[0] = NOINPUT;
         snprintf(msg, MAXLENGTH,
@@ -312,7 +313,7 @@ bool doLogin(const char username[MAXLENGTH], const char password[MAXLENGTH], cha
     // could use malloced string
     //return user;
 
-    return TRUE;
+    return true;
 }
 
 // need maxlength here?
@@ -399,9 +400,9 @@ char *getNextMessage(const char *buffer, ssize_t bytesReceived, char *curMessage
 bool broadcast(User *sender, char *msg, MessageType messageType) {
     bool complete = true;
     for (UserList *cur = userList; cur != NULL; cur = cur->next) {
-        if (cur->user != sender && (isLoggedIn(cur->user) == TRUE)) {
-            if (!(messageType == SERVER_MESSAGE && (isBlocked(sender, cur->user) == TRUE)) && // presence notifications: sender has not blocked receiver
-                !(messageType == USER_MESSAGE && (isBlocked(cur->user, sender) == TRUE))) {   // user messages: receiver has not blocked sender
+        if (cur->user != sender && (isLoggedIn(cur->user) == true)) {
+            if (!(messageType == SERVER_MESSAGE && (isBlocked(sender, cur->user) == true)) && // presence notifications: sender has not blocked receiver
+                !(messageType == USER_MESSAGE && (isBlocked(cur->user, sender) == true))) {   // user messages: receiver has not blocked sender
                 addMessage(sender, cur->user, msg, messageType);
             } else {
                 complete = false;

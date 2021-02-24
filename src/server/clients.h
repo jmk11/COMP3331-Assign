@@ -3,7 +3,7 @@
 
 #include <netinet/in.h>
 
-#include "user.h"
+#include "user/user.h"
 
 typedef struct ClientsList ClientsList;
 typedef struct Client Client;

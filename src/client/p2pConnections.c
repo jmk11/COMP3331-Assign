@@ -55,27 +55,27 @@ bool addUser(p2pNode **head, const char *partnerName) {
     strcpy(newNode->username, partnerName);
 
     if (head == NULL) {
-        return FALSE;
+        return false;
     }
     if (*head == NULL) {
         *head = newNode;
-        return TRUE;
+        return true;
     }
     p2pNode *cur = *head;
     for (; cur->next != NULL; cur = cur->next) {
         if (strcmp(cur->username, partnerName) == 0) {
             freep2pNode(newNode);
-            return FALSE;
+            return false;
         }
     }
     if (strcmp(cur->username, partnerName) == 0) {
         freep2pNode(newNode);
-        return FALSE;
+        return false;
     }
     // now cur is tail
 
     cur->next = newNode;
-    return TRUE;
+    return true;
 }
 
 // returns TRUE if found and removed, FALSE if not found
@@ -90,21 +90,21 @@ bool removeUser(p2pNode **head, const char *partnerName) {
             oldhead = *head;
             *head = (*head)->next;
             freep2pNode(oldhead);
-            return TRUE;
+            return true;
         } else {
             prev = *head;
             for (node = (*head)->next; node != NULL; node = node->next) {
                 if (strcmp(node->username, partnerName) == 0) {
                     prev->next = node->next;
                     freep2pNode(node);
-                    return TRUE;
+                    return true;
                     // break; // or set node = NULL to exit loop? //return head;
                 }
                 prev = node;
             }
         }
     }
-    return FALSE;
+    return false;
 }
 
 // returns TRUE if successfully set, FALSE if couldn't find username matching
@@ -113,11 +113,11 @@ bool setsockfd(p2pNode *head, const char *partnerName, int sockfd) {
     if (head != NULL) {
         if (strcmp(head->username, partnerName) == 0) {
             head->sockfd = sockfd;
-            return TRUE;
+            return true;
         }
         return setsockfd(head->next, partnerName, sockfd);
     }
-    return FALSE;
+    return false;
 }
 
 // returns 0 if sockfd not set

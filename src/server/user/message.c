@@ -30,7 +30,7 @@ struct Message {
     const User *sender;
     // User *sender;
     User *receiver; // needed? because stored inside receiver
-    const char *content;
+    char *content; // const except when it's freed so not const
 };
 
 struct Node {
@@ -44,7 +44,7 @@ struct Node {
 /*
 * Add message to tail of list
 */
-void pushMessage(messageList *list, User *sender, User *receiver, const char *msg, MessageType messageType) { // 'message' name
+void pushMessage(messageList *list, const User *sender, User *receiver, const char *msg, MessageType messageType) { // 'message' name
 // order of sender/receiver? it makes sense for it be different in User / message but that's crazy?
     if (sender != NULL && list != NULL) { 
         // !! double check of sender & receiver not null, in User and here
@@ -86,6 +86,7 @@ void pushMessage(messageList *list, User *sender, User *receiver, const char *ms
 * Once you are finished with the message's content or have copied it, call popMessage() to free and remove from the list.
 */
 void getMessage(messageList *list, const User **sender, const char **content, MessageType *messageType) {
+    // I'm quite sure that User** const sender is wrong use
     sem_wait(&(list->messageCount)); 
     // !! Sem_wait
 

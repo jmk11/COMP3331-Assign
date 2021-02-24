@@ -55,7 +55,7 @@ Provides main() function for client application
 
 ssize_t loginC(int sockfd, char *buffer);
 //ssize_t recv2(int sockfd, char *buf, size_t len, int flags);
-void printBuf(ssize_t len, char *buf);
+// void printBuf(ssize_t len, char *buf);
 void printMessage(char *message);
 
 int buildSocket(struct in_addr IPNetworkOrder, unsigned short portNetworkOrder);
@@ -178,8 +178,8 @@ int main (int argc, char **argv)
     char input[BUFSIZ];
     ssize_t bytesRead;
     //char *curMessage;
-    bool continueSession = TRUE;
-    while (continueSession == TRUE) {
+    bool continueSession = true;
+    while (continueSession == true) {
         poll(pollfds, nfds, -1);
         if (pollfds[recvPoll].revents & POLLIN) {
             //bytesReceived = recv(sockfd, buffer, BUFSIZ, 0);
@@ -244,10 +244,10 @@ int main (int argc, char **argv)
         //              or set fd to -1 or something to indicate unused (poll() will skip negative fds)
         //              and when looking for a new space, loop through until find fd == -1
         else {
-            bool found = FALSE;
-            for (unsigned int i = firstp2p; i < nfds && found == FALSE; i++) {
+            bool found = false;
+            for (unsigned int i = firstp2p; i < nfds && found == false; i++) {
                 if (pollfds[i].revents & POLLIN) {
-                    found = TRUE;
+                    found = true;
                     bytesReceived = recv(pollfds[i].fd, buffer, BUFSIZ, 0);
                     char *senderName = findUserName(p2plist, pollfds[i].fd); // go through p2pconnectionslist and find usernamd matching sockfd
                     if (bytesReceived > 0) {
@@ -324,7 +324,7 @@ void handlestdin(int serversockfd, p2pNode **p2plist, char *input, char **remove
         }
         else {
             bool success = addToList(p2plist, partnerName);
-            if (success == TRUE) {
+            if (success == true) {
                 send(serversockfd, input, length, 0);
             }
         }
@@ -332,7 +332,7 @@ void handlestdin(int serversockfd, p2pNode **p2plist, char *input, char **remove
     else if (strcmp(input, "stopprivate") == 0) {
         char *partnerName = getPartnerName(argstext, NULL);
         //bool existed = removeUser(p2plist, partnerName);
-        //if (existed == TRUE) {
+        //if (existed == true) {
         if (partnerName != NULL && partnerName[0] != 0) {
             *removePartnerName = Malloc(strlen(partnerName) + 1);
             strcpy(*removePartnerName, partnerName);
@@ -375,23 +375,23 @@ void addPollfd(unsigned int *pollSize, int newfd, struct pollfd **pollfds, unsig
 {
     unsigned int pollfdpos = *nfds;
     //*nfds += 1;
-    bool foundEmpty = FALSE;
+    bool foundEmpty = false;
     if (*nfds >= *pollSize) { // no more space
         if (*numEmptyPolls > 0) {
             // find empty poll < nfds - fd = -1
-            for (unsigned int i = start; foundEmpty == FALSE && i < *nfds; i++) {
+            for (unsigned int i = start; foundEmpty == false && i < *nfds; i++) {
                 if ((*pollfds)[i].fd == -1) {
                     pollfdpos = i;
-                    foundEmpty = TRUE;
+                    foundEmpty = true;
                     *numEmptyPolls -= 1;
                 }
             }
-            if (foundEmpty == FALSE) { // we were lied to. prob should assert so if this does happen I can fix error but..
+            if (foundEmpty == false) { // we were lied to. prob should assert so if this does happen I can fix error but..
                 *numEmptyPolls = 0;
             }
             //*nfds -= 1; // undo because didn't end up adding new
         }
-        if (foundEmpty == FALSE) {
+        if (foundEmpty == false) {
             //*nfds += 1; // nfds is more like lastusedfd
             *pollSize += 10;
             *pollfds = Reallocarray((*pollfds), *pollSize, sizeof(*(*pollfds)));
@@ -399,7 +399,7 @@ void addPollfd(unsigned int *pollSize, int newfd, struct pollfd **pollfds, unsig
             //reallocarray checks for overflow in the multiplication
         }
     }
-    if (foundEmpty == FALSE) { *nfds += 1; }
+    if (foundEmpty == false) { *nfds += 1; }
     (*pollfds)[pollfdpos].fd = newfd;
     (*pollfds)[pollfdpos].events = POLLIN;
 }
@@ -416,10 +416,10 @@ char *getPartnerName(char *argstext, char **restargs)
 
 bool addToList(p2pNode **p2plist, char *partnerName)
 {
-    bool success = FALSE;
+    bool success = false;
     if (partnerName != NULL) { // if parterName is null, server will handle error message
         success = addUser(p2plist, partnerName);
-        if (success == FALSE) {
+        if (success == false) {
             printf("You already have a private connection with user %s\n", partnerName);
         }
     }
@@ -481,7 +481,7 @@ int buildSocket(struct in_addr IPNetworkOrder, unsigned short portNetworkOrder)
 // sets *newPartnername to malloced memory. caller needs to free
 bool manageRecv(char *buffer, ssize_t bytesReceived, char **newPartnerName, int *newSockfd, p2pList **p2plist)
 {
-    bool continueSession = TRUE;
+    bool continueSession = true;
     //*newParterName = NULL;
     //*newSockfd = 0;
 
@@ -534,7 +534,7 @@ bool manageRecv(char *buffer, ssize_t bytesReceived, char **newPartnerName, int 
             //printBuf(bytesReceived, buffer);
         }
     }
-    else { continueSession = FALSE; }
+    else { continueSession = false; }
     return continueSession;
 }
 
@@ -556,7 +556,7 @@ char *getNextMessage(const char *buffer, ssize_t bytesReceived, char *curMessage
  * I didn't think to include this for the first buffer after logging until I tested on CSE, and the offline messages didn't appear
  * I guess CSE managed the switching between processes differently to my computer
  */
-void printBuf(ssize_t len, char *buf)
+/*void printBuf(ssize_t len, char *buf)
 {
     printf("%s", buf);
     for (size_t i = 0; i < len - 1; i++) {
@@ -564,7 +564,7 @@ void printBuf(ssize_t len, char *buf)
             printf("%s", &(buf[i+1]));
         }
     }
-}
+}*/
 
 // why does this function exist?
 void printMessage(char *message)

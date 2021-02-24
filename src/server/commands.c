@@ -235,14 +235,14 @@ bool execStartPrivate(char *argsinput, Connection *connection) {
             appendBuffer(&connection->sendBuffer,
                          "You can't start a P2P connection with yourself!\n",
                          0);
-        } else if (isBlocked(partnerUser, connection->client->user) == TRUE) {
+        } else if (isBlocked(partnerUser, connection->client->user) == true) {
             sendP2PFail(connection, partnerName);
             char str[MAXLENGTH];
             snprintf(str, MAXLENGTH,
                      "You can't connect with %s as they have blocked you.\n",
                      partnerName);
             appendBuffer(&connection->sendBuffer, str, 0);
-        } else if (isLoggedIn(partnerUser) == FALSE) {
+        } else if (isLoggedIn(partnerUser) == false) {
             sendP2PFail(connection, partnerName);
             char str[MAXLENGTH];
             snprintf(str, MAXLENGTH,

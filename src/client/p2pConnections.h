@@ -1,6 +1,8 @@
 #ifndef PROJECT_P2PCONNECTIONS_H
 #define PROJECT_P2PCONNECTIONS_H
 
+#include <stdbool.h>
+
 #include "common/constants.h"
 
 typedef struct p2pNode p2pNode;

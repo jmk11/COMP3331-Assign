@@ -2,7 +2,7 @@
 #define PROJECT_SERVER_H
 
 #include "clients.h"
-#include "user.h"
+#include "user/user.h"
 
 // some of this should be private
 

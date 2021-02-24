@@ -19,7 +19,7 @@ struct messageList {
 
 void freeMessages(Node *node);
 void pushMessage(messageList *list, const User *sender, User *receiver, const char *msg, MessageType messageType);
-void getMessage(messageList *list, User **sender, char **content, MessageType *messageType);
+void getMessage(messageList *list, const User** sender, const char** content, MessageType *messageType);
 void popMessage(messageList *list);
 
 #endif //PROJECT_MESSAGE_H

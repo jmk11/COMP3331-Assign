@@ -2,6 +2,7 @@
 #define PROJECT_USER_H
 
 #include <time.h>
+#include <stdbool.h>
 
 #include "common/constants.h"
 // maybe messageType should be defined here?
@@ -21,7 +22,7 @@ void logout(User *user);
 
 bool hasMessages(User *user);
 void addMessage(const User *sender, User *receiver, const char *msg, MessageType messageType);
-bool retrieveMessage(User *receiver, char **senderName, char **content, MessageType *messageType);
+void retrieveMessage(User *receiver, char **senderName, char **content, MessageType *messageType);
 void clearMessage(User *receiver);
 
 bool blockUser(User *blocker, const User *blockee);

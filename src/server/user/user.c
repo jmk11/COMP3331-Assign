@@ -19,7 +19,7 @@ then this new login attempt is denied
 #include <string.h>
 #include <sys/eventfd.h>
 #include <time.h>
-#include <stdbool.h>
+// #include <stdbool.h>
 
 #include "blockedusers.h"
 #include "common/helpers.h"
@@ -173,17 +173,19 @@ void addMessage(const User *sender, User *receiver, const char *msg, MessageType
  */
 // not sure if this needs lock because will be retrieving from beginning,
 // while others will only be writing to end
-bool retrieveMessage(User *receiver, char **senderName, char **content, MessageType *messageType) {
+void retrieveMessage(User *receiver, char **senderName, char **content, MessageType *messageType) {
     User *sender;
-    bool result = getMessage(&receiver->messages, &sender, content, messageType);
-    if (result != FALSE) {
+    getMessage(&receiver->messages, &sender, content, messageType);
+    *senderName = sender->username;
+    /*bool result = getMessage(&receiver->messages, &sender, content, messageType);
+    if (result != false) {
         *senderName = sender->username;
     } else {
-        //*senderName = NULL;
-        //*content = NULL;
+        // *senderName = NULL;
+        // *content = NULL;
         // return 0 -> unchanged?
     }
-    return result;
+    return result;*/
 }
 
 // many layers again
@@ -225,13 +227,13 @@ bool blockUser(User *blocker, const User *blockee) {
 
 // readwrite (write) lock
 bool unblockUser(User *blocker, const User *blockee) {
-    if (isBlocked(blocker, blockee) == TRUE) { // slow way of doing it - goes through list once to check if blocked and again to remove.
+    if (isBlocked(blocker, blockee) == true) { // slow way of doing it - goes through list once to check if blocked and again to remove.
                                                // could change removeUser() so that could return whether or not blocked !!
         //blocker->blockedUsers = removeUser(blocker->blockedUsers, blockee);
         removeUser(blocker->blockedUsers, blockee);
-        return TRUE;
+        return true;
     }
-    return FALSE;
+    return false;
 }
 
 //======================================================================
