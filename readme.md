@@ -30,5 +30,4 @@ startprivate <user>        Start P2P connection with specific user
 private <user> <msg>       Send message over P2P connection to specific user
 stopprivate <user>         End P2P connection with specific user
 logout:                    Logout
-
 ```
