@@ -1,4 +1,5 @@
 Instant messaging client and server. Multithreaded CLI applications developed for COMP3331 Computer Networks & Applications UNSW.
+Supports client-server-client messaging and also P2P client-client messaging.
 
 #### Build and run
 ```bash
